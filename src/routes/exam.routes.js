@@ -27,7 +27,7 @@ router.post('/createExam', requireRoles(EXAM_ROLES.CREATE_EXAM), createExam);
 router.get('/getAllExams', requireRoles(EXAM_ROLES.VIEW_EXAMS), getAllExams);
 router.get('/getExamsByUser', requireRoles(EXAM_ROLES.VIEW_EXAMS), getExamsByUserId);
 router.get('/getExam/:id', requireRoles(EXAM_ROLES.VIEW_EXAMS), getExamById);
-router.get('/getExamWithContents/:id', requireRoles(EXAM_ROLES.VIEW_EXAMS), getExamWithSubjectsAndTopics);
+router.get('/getExamsSubjectAndTopics/:id', requireRoles(EXAM_ROLES.VIEW_EXAMS), getExamWithSubjectsAndTopics);
 router.put('/updateExam/:id', requireRoles(EXAM_ROLES.MANAGE_EXAMS), updateExamById);
 router.delete('/deleteExam/:id', requireRoles(EXAM_ROLES.MANAGE_EXAMS), deleteExamById);
 
