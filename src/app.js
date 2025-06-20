@@ -3,10 +3,21 @@ const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const { sendError, HTTP_STATUS } = require('./utils/response');
 const { extractRoles } = require('./middleware/role.middleware');
+const { helmet, cors, rateLimit } = require('./middleware/security.middleware');
+const config = require('./config');
 
 const app = express();
 
-// Middleware
+// Security Middleware - Apply before route handlers
+app.use(helmet()); // Set security HTTP headers
+app.use(cors()); // Enable CORS for all routes
+
+// Rate limiting - Only apply in production
+if (config.isProd) {
+  app.use(rateLimit());
+}
+
+// Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
