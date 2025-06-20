@@ -2,12 +2,16 @@ const express = require('express');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const { sendError, HTTP_STATUS } = require('./utils/response');
+const { extractRoles } = require('./middleware/role.middleware');
 
 const app = express();
 
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Extract user roles from headers for all routes
+app.use(extractRoles);
 
 // Simple Hello World route
 app.get('/', (req, res) => {

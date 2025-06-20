@@ -4,6 +4,7 @@ const router = express.Router();
 // Import shared users array from dedicated module
 const users = require('../models/users');
 const { sendSuccess, sendError, HTTP_STATUS } = require('../utils/response');
+const { requireRoles } = require('../middleware/role.middleware');
 
 /**
  * Handle user profile request with userId parameter
@@ -49,8 +50,14 @@ const handleAllProfiles = (req, res) => {
   );
 };
 
-// Routes
-router.get('/profile', handleUserProfileWithId);
-router.get('/allUsers', handleAllProfiles);
+// Define roles for different routes
+const USER_ROLES = {
+  VIEW_PROFILE: ['user', 'admin', 'teacher', 'student'],
+  VIEW_ALL_PROFILES: ['admin', 'teacher']
+};
+
+// Routes with role-based access control
+router.get('/profile', requireRoles(USER_ROLES.VIEW_PROFILE), handleUserProfileWithId);
+router.get('/allUsers', requireRoles(USER_ROLES.VIEW_ALL_PROFILES), handleAllProfiles);
 
 module.exports = router;
