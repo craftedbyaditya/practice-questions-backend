@@ -5,12 +5,16 @@
 require('dotenv').config();
 
 // Helper to validate required environment variables
-const requiredEnvVar = (key) => {
+const requiredEnvVar = (key, devFallback = null) => {
   const value = process.env[key];
+  
+  // In production, we must have the actual environment variable
   if (!value && process.env.NODE_ENV === 'production') {
     throw new Error(`Environment variable ${key} is required in production mode`);
   }
-  return value;
+  
+  // In development, we can use a fallback if the variable isn't set
+  return value || devFallback;
 };
 
 // Parse numeric environment variables
@@ -91,8 +95,8 @@ const config = {
   // Database settings (Supabase)
   database: {
     supabase: {
-      url: requiredEnvVar('SUPABASE_URL'),
-      key: requiredEnvVar('SUPABASE_KEY'),
+      url: requiredEnvVar('SUPABASE_URL', 'https://czdvsfaeghnbitmwozmr.supabase.co'),
+      key: requiredEnvVar('SUPABASE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN6ZHZzZmFlZ2huYml0bXdvem1yIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Njg1MTQ0MiwiZXhwIjoyMDYyNDI3NDQyfQ.1JSXyr1ev4n6aTn-Ch5LSmmcyn9ZUy3hIvz_EmNUcxE'),
       jwtSecret: process.env.SUPABASE_JWT_SECRET,
     }
   },
@@ -100,7 +104,7 @@ const config = {
   // API Services
   services: {
     api: {
-      baseUrl: requiredEnvVar('API_BASE_URL'),
+      baseUrl: requiredEnvVar('API_BASE_URL', 'practice-questions-dev.vercel.app'),
     }
   },
 };
