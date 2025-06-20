@@ -84,26 +84,25 @@ const createSubject = async (req, res) => {
  */
 const getAllSubjects = async (req, res) => {
   try {
-    // Get all subjects from database
-    const subjects = await db.fetchData(SUBJECTS_TABLE);
+    // Get all active subjects from the database
+    const subjects = await db.fetchData(SUBJECTS_TABLE, {
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
+    });
     
-    // Return success response with subjects
+    // Return success response
     return sendSuccess(
-      res,
+      res, 
       'Subjects retrieved successfully',
       {
         subjects,
         count: subjects.length
-      }
+      },
+      HTTP_STATUS.OK
     );
   } catch (error) {
     console.error('Error retrieving subjects:', error);
-    return sendError(
-      res,
-      'Failed to retrieve subjects',
-      HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      error.message
-    );
+    return sendError(res, 'Failed to retrieve subjects', HTTP_STATUS.INTERNAL_SERVER_ERROR, error.message);
   }
 };
 
@@ -124,9 +123,11 @@ const getSubjectsByExamId = async (req, res) => {
       );
     }
     
-    // Find subjects with the given exam ID
+    // Find active subjects with the given exam ID
     const subjects = await db.fetchData(SUBJECTS_TABLE, { 
-      exam_id: `eq.${examId}` 
+      exam_id: `eq.${examId}`,
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
     });
     
     // Return success response with subjects
@@ -166,15 +167,17 @@ const getSubjectById = async (req, res) => {
       );
     }
     
-    // Find the subject with the given ID
+    // Find the active subject with the given ID
     const subjects = await db.fetchData(SUBJECTS_TABLE, { 
-      id: `eq.${id}` 
+      id: `eq.${id}`,
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
     });
     
     if (!subjects || subjects.length === 0) {
       return sendError(
         res,
-        `Subject with ID ${id} not found`,
+        `Subject with ID ${id} not found or has been deleted`,
         HTTP_STATUS.NOT_FOUND
       );
     }
@@ -269,7 +272,7 @@ const updateSubjectById = async (req, res) => {
 };
 
 /**
- * Delete subject by ID
+ * Soft delete subject by ID by setting is_deleted=true and is_active=false
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -287,13 +290,14 @@ const deleteSubjectById = async (req, res) => {
     
     // Find the subject first to check if it exists and belongs to the user
     const subjects = await db.fetchData(SUBJECTS_TABLE, { 
-      id: `eq.${id}` 
+      id: `eq.${id}`,
+      is_deleted: 'eq.false' // Only operate on non-deleted subjects
     });
     
     if (!subjects || subjects.length === 0) {
       return sendError(
         res,
-        `Subject with ID ${id} not found`,
+        `Subject with ID ${id} not found or already deleted`,
         HTTP_STATUS.NOT_FOUND
       );
     }
@@ -310,10 +314,15 @@ const deleteSubjectById = async (req, res) => {
       );
     }
     
-    // Delete subject from database
-    await db.deleteData(SUBJECTS_TABLE, { id });
+    // Soft delete the subject by updating flags
+    const updateData = {
+      is_deleted: true,
+      is_active: false
+    };
     
-    console.log(`Subject ${id} deleted by user ${userId}`);
+    await db.updateData(SUBJECTS_TABLE, updateData, { id });
+    
+    console.log(`Subject ${id} soft deleted by user ${userId}`);
     
     // Return success response
     return sendSuccess(
@@ -340,7 +349,8 @@ const deleteSubjectById = async (req, res) => {
  */
 const getSubjectsByUserId = async (req, res) => {
   try {
-    const { userId } = req.query;
+    // Get user_id from authenticated user
+    const userId = req.userId;
     
     if (!userId) {
       return sendError(
@@ -350,9 +360,11 @@ const getSubjectsByUserId = async (req, res) => {
       );
     }
     
-    // Find subjects with the given user ID
+    // Find active subjects with the given user ID
     const subjects = await db.fetchData(SUBJECTS_TABLE, { 
-      user_id: `eq.${userId}` 
+      user_id: `eq.${userId}`,
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
     });
     
     // Return success response with subjects
@@ -365,7 +377,7 @@ const getSubjectsByUserId = async (req, res) => {
       }
     );
   } catch (error) {
-    console.error('Error retrieving subjects:', error);
+    console.error('Error retrieving subjects by user ID:', error);
     return sendError(
       res,
       'Failed to retrieve subjects',

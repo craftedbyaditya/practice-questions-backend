@@ -75,26 +75,25 @@ const createExam = async (req, res) => {
  */
 const getAllExams = async (req, res) => {
   try {
-    // Get all exams from database
-    const exams = await db.fetchData(EXAMS_TABLE);
+    // Get all active exams from the database
+    const exams = await db.fetchData(EXAMS_TABLE, {
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
+    });
     
-    // Return success response with exams
+    // Return success response
     return sendSuccess(
-      res,
+      res, 
       'Exams retrieved successfully',
       {
         exams,
         count: exams.length
-      }
+      },
+      HTTP_STATUS.OK
     );
   } catch (error) {
     console.error('Error retrieving exams:', error);
-    return sendError(
-      res,
-      'Failed to retrieve exams',
-      HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      error.message
-    );
+    return sendError(res, 'Failed to retrieve exams', HTTP_STATUS.INTERNAL_SERVER_ERROR, error.message);
   }
 };
 
@@ -106,24 +105,25 @@ const getAllExams = async (req, res) => {
 const getExamById = async (req, res) => {
   try {
     const { id } = req.params;
-    
     if (!id) {
       return sendError(
-        res,
-        'Exam ID is required',
+        res, 
+        'Exam ID is required', 
         HTTP_STATUS.BAD_REQUEST
       );
     }
-    
-    // Find the exam with the given ID
+
+    // Find the active exam with the given ID
     const exams = await db.fetchData(EXAMS_TABLE, { 
-      id: `eq.${id}` 
+      id: `eq.${id}`,
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
     });
     
     if (!exams || exams.length === 0) {
       return sendError(
         res,
-        `Exam with ID ${id} not found`,
+        `Exam with ID ${id} not found or has been deleted`,
         HTTP_STATUS.NOT_FOUND
       );
     }
@@ -132,7 +132,8 @@ const getExamById = async (req, res) => {
     return sendSuccess(
       res,
       'Exam retrieved successfully',
-      exams[0]
+      exams[0],
+      HTTP_STATUS.OK
     );
   } catch (error) {
     console.error('Error retrieving exam:', error);
@@ -217,68 +218,53 @@ const updateExamById = async (req, res) => {
 };
 
 /**
- * Delete exam by ID
+ * Soft delete exam by ID by setting is_deleted=true and is_active=false
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
 const deleteExamById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    if (!id) {
-      return sendError(
-        res,
-        'Exam ID is required',
-        HTTP_STATUS.BAD_REQUEST
-      );
-    }
-    
-    // Find the exam first to check if it exists and belongs to the user
-    const exams = await db.fetchData(EXAMS_TABLE, { 
-      id: `eq.${id}` 
-    });
-    
-    if (!exams || exams.length === 0) {
-      return sendError(
-        res,
-        `Exam with ID ${id} not found`,
-        HTTP_STATUS.NOT_FOUND
-      );
-    }
-    
-    // Get the user_id from the authenticated user information
-    const userId = req.userId;
-    
-    // Only allow deletion if the exam belongs to the current user or user is admin
-    if (exams[0].user_id !== userId && !req.userRoles.includes('admin')) {
-      return sendError(
-        res,
-        'You do not have permission to delete this exam',
-        HTTP_STATUS.FORBIDDEN
-      );
-    }
-    
-    // Delete exam from database
-    await db.deleteData(EXAMS_TABLE, { id });
-    
-    console.log(`Exam ${id} deleted by user ${userId}`);
-    
-    // Return success response
-    return sendSuccess(
-      res,
-      'Exam deleted successfully',
-      { id },
-      HTTP_STATUS.OK
-    );
-  } catch (error) {
-    console.error('Error deleting exam:', error);
-    return sendError(
-      res,
-      'Failed to delete exam',
-      HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      error.message
-    );
+try {
+  const { id } = req.params;
+  
+  if (!id) {
+    return sendError(res, 'Exam ID is required', HTTP_STATUS.BAD_REQUEST);
   }
+  
+  // Find exam to check ownership - exclude already deleted exams
+  const exams = await db.fetchData(EXAMS_TABLE, { 
+    id: `eq.${id}`,
+    is_deleted: 'eq.false'
+  });
+  
+  if (!exams || exams.length === 0) {
+    return sendError(res, `Exam with ID ${id} not found or already deleted`, HTTP_STATUS.NOT_FOUND);
+  }
+  
+  // Check if the user has permission to delete this exam
+  const userId = req.userId;
+  if (exams[0].user_id !== userId && !req.userRoles.includes('admin')) {
+    return sendError(res, 'You do not have permission to delete this exam', HTTP_STATUS.FORBIDDEN);
+  }
+  
+  // Soft delete the exam by updating flags
+  const updateData = {
+    is_deleted: true,
+    is_active: false
+  };
+  
+  await db.updateData(EXAMS_TABLE, updateData, { id });
+  
+  console.log(`Exam ${id} soft deleted by setting is_deleted=true and is_active=false`);
+  
+  return sendSuccess(
+    res, 
+    'Exam deleted successfully',
+    { id },
+    HTTP_STATUS.OK
+  );
+} catch (error) {
+  return sendError(res, 'Failed to delete exam', HTTP_STATUS.INTERNAL_SERVER_ERROR, error.message);
+}
 };
 
 /**
@@ -298,9 +284,11 @@ const getExamsByUserId = async (req, res) => {
       );
     }
     
-    // Find exams with the given user ID
+    // Find active exams with the given user ID
     const exams = await db.fetchData(EXAMS_TABLE, { 
-      user_id: `eq.${userId}` 
+      user_id: `eq.${userId}`,
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
     });
     
     // Return success response with exams
@@ -313,7 +301,7 @@ const getExamsByUserId = async (req, res) => {
       }
     );
   } catch (error) {
-    console.error('Error retrieving exams:', error);
+    console.error('Error retrieving exams by user ID:', error);
     return sendError(
       res,
       'Failed to retrieve exams',
@@ -336,21 +324,33 @@ const getExamWithSubjectsAndTopics = async (req, res) => {
       return sendError(res, 'Exam ID is required', HTTP_STATUS.BAD_REQUEST);
     }
     
-    // Get exam first
-    const exams = await db.fetchData(EXAMS_TABLE, { id: `eq.${id}` });
+    // Get active exam first
+    const exams = await db.fetchData(EXAMS_TABLE, { 
+      id: `eq.${id}`,
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
+    });
     if (!exams || exams.length === 0) {
-      return sendError(res, `Exam with ID ${id} not found`, HTTP_STATUS.NOT_FOUND);
+      return sendError(res, `Exam with ID ${id} not found or has been deleted`, HTTP_STATUS.NOT_FOUND);
     }
     const exam = exams[0];
     
-    // Get subjects for this exam
-    const subjects = await db.fetchData('subjects', { exam_id: `eq.${id}` });
+    // Get active subjects for this exam
+    const subjects = await db.fetchData('subjects', { 
+      exam_id: `eq.${id}`,
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
+    });
     
-    // For each subject, get its topics
+    // For each subject, get its active topics
     const subjectsWithTopics = [];
     
     for (const subject of subjects) {
-      const topics = await db.fetchData('topics', { subject_id: `eq.${subject.id}` });
+      const topics = await db.fetchData('topics', { 
+        subject_id: `eq.${subject.id}`,
+        is_deleted: 'eq.false',
+        is_active: 'eq.true'
+      });
       
       subjectsWithTopics.push({
         ...subject,

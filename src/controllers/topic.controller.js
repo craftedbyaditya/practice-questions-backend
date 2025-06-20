@@ -107,8 +107,11 @@ const createTopic = async (req, res) => {
  */
 const getAllTopics = async (req, res) => {
   try {
-    // Get all topics from database
-    const topics = await db.fetchData(TOPICS_TABLE);
+    // Get all active topics from the database
+    const topics = await db.fetchData(TOPICS_TABLE, {
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
+    });
     
     // Return success response with topics
     return sendSuccess(
@@ -147,9 +150,11 @@ const getTopicsBySubjectId = async (req, res) => {
       );
     }
     
-    // Find topics with the given subject ID
+    // Find active topics with the given subject ID
     const topics = await db.fetchData(TOPICS_TABLE, { 
-      subject_id: `eq.${subjectId}` 
+      subject_id: `eq.${subjectId}`,
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
     });
     
     // Return success response with topics
@@ -189,9 +194,11 @@ const getTopicsByExamId = async (req, res) => {
       );
     }
     
-    // First get all subjects for this exam
+    // First get all active subjects for this exam
     const subjects = await db.fetchData('subjects', { 
-      exam_id: `eq.${examId}` 
+      exam_id: `eq.${examId}`,
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
     });
     
     if (!subjects || subjects.length === 0) {
@@ -214,7 +221,9 @@ const getTopicsByExamId = async (req, res) => {
     
     for (const subjectId of subjectIds) {
       const topics = await db.fetchData(TOPICS_TABLE, { 
-        subject_id: `eq.${subjectId}` 
+        subject_id: `eq.${subjectId}`,
+        is_deleted: 'eq.false',
+        is_active: 'eq.true' 
       });
       
       if (topics && topics.length > 0) {
@@ -265,15 +274,17 @@ const getTopicById = async (req, res) => {
       );
     }
     
-    // Find the topic with the given ID
+    // Find the active topic with the given ID
     const topics = await db.fetchData(TOPICS_TABLE, { 
-      id: `eq.${id}` 
+      id: `eq.${id}`,
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
     });
     
     if (!topics || topics.length === 0) {
       return sendError(
         res,
-        `Topic with ID ${id} not found`,
+        `Topic with ID ${id} not found or has been deleted`,
         HTTP_STATUS.NOT_FOUND
       );
     }
@@ -368,7 +379,7 @@ const updateTopicById = async (req, res) => {
 };
 
 /**
- * Delete topic by ID
+ * Soft delete topic by ID by setting is_deleted=true and is_active=false
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
@@ -386,13 +397,14 @@ const deleteTopicById = async (req, res) => {
     
     // Find the topic first to check if it exists and belongs to the user
     const topics = await db.fetchData(TOPICS_TABLE, { 
-      id: `eq.${id}` 
+      id: `eq.${id}`,
+      is_deleted: 'eq.false' // Only operate on non-deleted topics
     });
     
     if (!topics || topics.length === 0) {
       return sendError(
         res,
-        `Topic with ID ${id} not found`,
+        `Topic with ID ${id} not found or already deleted`,
         HTTP_STATUS.NOT_FOUND
       );
     }
@@ -409,10 +421,15 @@ const deleteTopicById = async (req, res) => {
       );
     }
     
-    // Delete topic from database
-    await db.deleteData(TOPICS_TABLE, { id });
+    // Soft delete the topic by updating flags
+    const updateData = {
+      is_deleted: true,
+      is_active: false
+    };
     
-    console.log(`Topic ${id} deleted by user ${userId}`);
+    await db.updateData(TOPICS_TABLE, updateData, { id });
+    
+    console.log(`Topic ${id} soft deleted by user ${userId}`);
     
     // Return success response
     return sendSuccess(
@@ -439,7 +456,8 @@ const deleteTopicById = async (req, res) => {
  */
 const getTopicsByUserId = async (req, res) => {
   try {
-    const { userId } = req.query;
+    // Get user_id from authenticated user
+    const userId = req.userId;
     
     if (!userId) {
       return sendError(
@@ -449,9 +467,11 @@ const getTopicsByUserId = async (req, res) => {
       );
     }
     
-    // Find topics with the given user ID
+    // Find active topics with the given user ID
     const topics = await db.fetchData(TOPICS_TABLE, { 
-      user_id: `eq.${userId}` 
+      user_id: `eq.${userId}`,
+      is_deleted: 'eq.false',
+      is_active: 'eq.true'
     });
     
     // Return success response with topics
