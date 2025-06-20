@@ -25,6 +25,16 @@ const createExam = async (req, res) => {
       );
     }
     
+    // Check if user has authorized role (admin, org, or teacher)
+    const userRoles = req.userRoles || [];
+    if (!userRoles.some(role => ['admin', 'org', 'teacher'].includes(role))) {
+      return sendError(
+        res,
+        'Only admin, org, or teacher roles can create exams',
+        HTTP_STATUS.FORBIDDEN
+      );
+    }
+    
     // Get the user_id from the authenticated user information
     // Assuming user_id is attached to request by auth middleware
     const user_id = req.userId;
@@ -177,14 +187,13 @@ const updateExamById = async (req, res) => {
       );
     }
     
-    // Get the user_id from the authenticated user information
-    const userId = req.userId;
-    
-    // Only allow update if the exam belongs to the current user or user is admin
-    if (exams[0].user_id !== userId && !req.userRoles.includes('admin')) {
+    // Check if user has authorized role (admin, org, or teacher)
+    const userRoles = req.userRoles || [];
+    const hasAuthorizedRole = userRoles.some(role => ['admin', 'org', 'teacher'].includes(role));
+    if (!hasAuthorizedRole || (exams[0].user_id !== req.userId && !userRoles.includes('admin'))) {
       return sendError(
         res,
-        'You do not have permission to update this exam',
+        'Only admin, org, and teacher roles can update exams (non-admin users can only update their own exams)',
         HTTP_STATUS.FORBIDDEN
       );
     }
@@ -197,7 +206,7 @@ const updateExamById = async (req, res) => {
     // Update exam in database
     const updatedExam = await db.updateData(EXAMS_TABLE, updateData, { id });
     
-    console.log(`Exam ${id} updated by user ${userId}`);
+    console.log(`Exam ${id} updated by user ${req.userId}`);
     
     // Return success response
     return sendSuccess(
@@ -223,48 +232,51 @@ const updateExamById = async (req, res) => {
  * @param {Object} res - Express response object
  */
 const deleteExamById = async (req, res) => {
-try {
-  const { id } = req.params;
-  
-  if (!id) {
-    return sendError(res, 'Exam ID is required', HTTP_STATUS.BAD_REQUEST);
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return sendError(res, 'Exam ID is required', HTTP_STATUS.BAD_REQUEST);
+    }
+    
+    // Find exam to check ownership - exclude already deleted exams
+    const exams = await db.fetchData(EXAMS_TABLE, { 
+      id: `eq.${id}`,
+      is_deleted: 'eq.false'
+    });
+    
+    if (!exams || exams.length === 0) {
+      return sendError(res, `Exam with ID ${id} not found or already deleted`, HTTP_STATUS.NOT_FOUND);
+    }
+    
+    // Check if user has authorized role (admin, org, or teacher)
+    const userRoles = req.userRoles || [];
+    const hasAuthorizedRole = userRoles.some(role => ['admin', 'org', 'teacher'].includes(role));
+    if (!hasAuthorizedRole || (exams[0].user_id !== req.userId && !userRoles.includes('admin'))) {
+      return sendError(res, 'Only admin, org, and teacher roles can delete exams (non-admin users can only delete their own exams)', HTTP_STATUS.FORBIDDEN);
+    }
+    
+    // Soft delete the exam by updating flags
+    const updateData = {
+      is_deleted: true,
+      is_active: false
+    };
+    
+    await db.updateData(EXAMS_TABLE, updateData, { id });
+    
+    console.log(`Exam ${id} soft deleted by setting is_deleted=true and is_active=false`);
+    
+    return sendSuccess(
+      res, 
+      'Exam deleted successfully',
+      { id },
+      HTTP_STATUS.OK
+    );
+  } catch (error) {
+    return sendError(res, 'Failed to delete exam', HTTP_STATUS.INTERNAL_SERVER_ERROR, error.message);
   }
   
-  // Find exam to check ownership - exclude already deleted exams
-  const exams = await db.fetchData(EXAMS_TABLE, { 
-    id: `eq.${id}`,
-    is_deleted: 'eq.false'
-  });
-  
-  if (!exams || exams.length === 0) {
-    return sendError(res, `Exam with ID ${id} not found or already deleted`, HTTP_STATUS.NOT_FOUND);
-  }
-  
-  // Check if the user has permission to delete this exam
-  const userId = req.userId;
-  if (exams[0].user_id !== userId && !req.userRoles.includes('admin')) {
-    return sendError(res, 'You do not have permission to delete this exam', HTTP_STATUS.FORBIDDEN);
-  }
-  
-  // Soft delete the exam by updating flags
-  const updateData = {
-    is_deleted: true,
-    is_active: false
-  };
-  
-  await db.updateData(EXAMS_TABLE, updateData, { id });
-  
-  console.log(`Exam ${id} soft deleted by setting is_deleted=true and is_active=false`);
-  
-  return sendSuccess(
-    res, 
-    'Exam deleted successfully',
-    { id },
-    HTTP_STATUS.OK
-  );
-} catch (error) {
-  return sendError(res, 'Failed to delete exam', HTTP_STATUS.INTERNAL_SERVER_ERROR, error.message);
-}
+
 };
 
 /**

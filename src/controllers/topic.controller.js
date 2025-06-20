@@ -33,8 +33,17 @@ const createTopic = async (req, res) => {
       );
     }
     
+    // Check if user has authorized role (admin, org, or teacher)
+    const userRoles = req.userRoles || [];
+    if (!userRoles.some(role => ['admin', 'org', 'teacher'].includes(role))) {
+      return sendError(
+        res,
+        'Only admin, org, or teacher roles can create topics',
+        HTTP_STATUS.FORBIDDEN
+      );
+    }
+    
     // Get the user_id from the authenticated user information
-    // Assuming user_id is attached to request by auth middleware
     const user_id = req.userId;
     
     if (!user_id) {
@@ -324,6 +333,16 @@ const updateTopicById = async (req, res) => {
       );
     }
     
+    // Check if user has authorized role (admin, org, or teacher)
+    const userRoles = req.userRoles || [];
+    if (!userRoles.some(role => ['admin', 'org', 'teacher'].includes(role))) {
+      return sendError(
+        res,
+        'Only admin, org, or teacher roles can update topics',
+        HTTP_STATUS.FORBIDDEN
+      );
+    }
+    
     // Find the topic first to check if it exists and belongs to the user
     const topics = await db.fetchData(TOPICS_TABLE, { 
       id: `eq.${id}` 
@@ -340,11 +359,12 @@ const updateTopicById = async (req, res) => {
     // Get the user_id from the authenticated user information
     const userId = req.userId;
     
-    // Only allow update if the topic belongs to the current user or user is admin
-    if (topics[0].user_id !== userId && !req.userRoles.includes('admin')) {
+    // Check if user has authorized role (admin, org, or teacher)
+    const hasAuthorizedRole = userRoles.some(role => ['admin', 'org', 'teacher'].includes(role));
+    if (!hasAuthorizedRole || (topics[0].user_id !== userId && !userRoles.includes('admin'))) {
       return sendError(
         res,
-        'You do not have permission to update this topic',
+        'Only admin, org, and teacher roles can update topics (non-admin users can only update their own topics)',
         HTTP_STATUS.FORBIDDEN
       );
     }
@@ -395,6 +415,16 @@ const deleteTopicById = async (req, res) => {
       );
     }
     
+    // Check if user has authorized role (admin, org, or teacher)
+    const userRoles = req.userRoles || [];
+    if (!userRoles.some(role => ['admin', 'org', 'teacher'].includes(role))) {
+      return sendError(
+        res,
+        'Only admin, org, or teacher roles can delete topics',
+        HTTP_STATUS.FORBIDDEN
+      );
+    }
+    
     // Find the topic first to check if it exists and belongs to the user
     const topics = await db.fetchData(TOPICS_TABLE, { 
       id: `eq.${id}`,
@@ -412,11 +442,12 @@ const deleteTopicById = async (req, res) => {
     // Get the user_id from the authenticated user information
     const userId = req.userId;
     
-    // Only allow deletion if the topic belongs to the current user or user is admin
-    if (topics[0].user_id !== userId && !req.userRoles.includes('admin')) {
+    // Check if user has authorized role (admin, org, or teacher)
+    const hasAuthorizedRole = userRoles.some(role => ['admin', 'org', 'teacher'].includes(role));
+    if (!hasAuthorizedRole || (topics[0].user_id !== userId && !userRoles.includes('admin'))) {
       return sendError(
         res,
-        'You do not have permission to delete this topic',
+        'Only admin, org, and teacher roles can delete topics (non-admin users can only delete their own topics)',
         HTTP_STATUS.FORBIDDEN
       );
     }

@@ -33,8 +33,17 @@ const createSubject = async (req, res) => {
       );
     }
     
+    // Check if user has authorized role (admin, org, or teacher)
+    const userRoles = req.userRoles || [];
+    if (!userRoles.some(role => ['admin', 'org', 'teacher'].includes(role))) {
+      return sendError(
+        res,
+        'Only admin, org, or teacher roles can create subjects',
+        HTTP_STATUS.FORBIDDEN
+      );
+    }
+    
     // Get the user_id from the authenticated user information
-    // Assuming user_id is attached to request by auth middleware
     const user_id = req.userId;
     
     if (!user_id) {
@@ -217,6 +226,16 @@ const updateSubjectById = async (req, res) => {
       );
     }
     
+    // Check if user has authorized role (admin, org, or teacher)
+    const userRoles = req.userRoles || [];
+    if (!userRoles.some(role => ['admin', 'org', 'teacher'].includes(role))) {
+      return sendError(
+        res,
+        'Only admin, org, or teacher roles can update subjects',
+        HTTP_STATUS.FORBIDDEN
+      );
+    }
+    
     // Find the subject first to check if it exists and belongs to the user
     const subjects = await db.fetchData(SUBJECTS_TABLE, { 
       id: `eq.${id}` 
@@ -233,11 +252,12 @@ const updateSubjectById = async (req, res) => {
     // Get the user_id from the authenticated user information
     const userId = req.userId;
     
-    // Only allow update if the subject belongs to the current user or user is admin
-    if (subjects[0].user_id !== userId && !req.userRoles.includes('admin')) {
+    // Check if user has authorized role (admin, org, or teacher)
+    const hasAuthorizedRole = userRoles.some(role => ['admin', 'org', 'teacher'].includes(role));
+    if (!hasAuthorizedRole || (subjects[0].user_id !== userId && !userRoles.includes('admin'))) {
       return sendError(
         res,
-        'You do not have permission to update this subject',
+        'Only admin, org, and teacher roles can update subjects (non-admin users can only update their own subjects)',
         HTTP_STATUS.FORBIDDEN
       );
     }
@@ -288,6 +308,16 @@ const deleteSubjectById = async (req, res) => {
       );
     }
     
+    // Check if user has authorized role (admin, org, or teacher)
+    const userRoles = req.userRoles || [];
+    if (!userRoles.some(role => ['admin', 'org', 'teacher'].includes(role))) {
+      return sendError(
+        res,
+        'Only admin, org, or teacher roles can delete subjects',
+        HTTP_STATUS.FORBIDDEN
+      );
+    }
+    
     // Find the subject first to check if it exists and belongs to the user
     const subjects = await db.fetchData(SUBJECTS_TABLE, { 
       id: `eq.${id}`,
@@ -305,11 +335,12 @@ const deleteSubjectById = async (req, res) => {
     // Get the user_id from the authenticated user information
     const userId = req.userId;
     
-    // Only allow deletion if the subject belongs to the current user or user is admin
-    if (subjects[0].user_id !== userId && !req.userRoles.includes('admin')) {
+    // Check if user has authorized role (admin, org, or teacher)
+    const hasAuthorizedRole = userRoles.some(role => ['admin', 'org', 'teacher'].includes(role));
+    if (!hasAuthorizedRole || (subjects[0].user_id !== userId && !userRoles.includes('admin'))) {
       return sendError(
         res,
-        'You do not have permission to delete this subject',
+        'Only admin, org, and teacher roles can delete subjects (non-admin users can only delete their own subjects)',
         HTTP_STATUS.FORBIDDEN
       );
     }
