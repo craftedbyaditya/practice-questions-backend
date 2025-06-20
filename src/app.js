@@ -1,6 +1,7 @@
 const express = require('express');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
+const { sendError, HTTP_STATUS } = require('./utils/response');
 
 const app = express();
 
@@ -31,11 +32,12 @@ app.use('/api/users', userRoutes);
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({
-    status: 'error',
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'production' ? {} : { message: err.message, stack: err.stack }
-  });
+  return sendError(
+    res,
+    'Something went wrong!',
+    HTTP_STATUS.INTERNAL_SERVER_ERROR,
+    err
+  );
 });
 
 module.exports = app;

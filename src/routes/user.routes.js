@@ -3,6 +3,7 @@ const router = express.Router();
 
 // Import shared users array from dedicated module
 const users = require('../models/users');
+const { sendSuccess, sendError, HTTP_STATUS } = require('../utils/response');
 
 /**
  * Handle user profile request with userId parameter
@@ -18,31 +19,34 @@ const handleUserProfileWithId = (req, res, next) => {
   const user = users.find(u => u.user_id === userId);
   
   if (!user) {
-    return res.status(404).json({
-      status: 'error',
-      message: `User with ID ${userId} not found`
-    });
+    return sendError(
+      res,
+      `User with ID ${userId} not found`, 
+      HTTP_STATUS.NOT_FOUND
+    );
   }
   
-  return res.json({
-    status: 'success',
-    message: 'User profile retrieved successfully',
-    userData: user,
-    timestamp: new Date().toISOString()
-  });
+  return sendSuccess(
+    res,
+    'User profile retrieved successfully',
+    user
+  );
 };
 
 /**
  * Handle request for all user profiles
  */
 const handleAllProfiles = (req, res) => {
-  res.json({
-    status: 'success',
-    message: 'All user profiles retrieved successfully',
-    users: users,
-    count: users.length,
-    timestamp: new Date().toISOString()
-  });
+  const responseData = {
+    profiles: users,
+    count: users.length
+  };
+  
+  return sendSuccess(
+    res,
+    'All user profiles retrieved successfully',
+    responseData
+  );
 };
 
 // Routes
