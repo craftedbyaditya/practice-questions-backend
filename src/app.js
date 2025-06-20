@@ -1,9 +1,11 @@
 const express = require('express');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
+const examRoutes = require('./routes/exam.routes');
 const { sendError, HTTP_STATUS } = require('./utils/response');
 const { extractRoles } = require('./middleware/role.middleware');
 const { helmet, cors, rateLimit } = require('./middleware/security.middleware');
+const authMiddleware = require('./middleware/auth.middleware');
 const config = require('./config');
 
 const app = express();
@@ -21,8 +23,9 @@ if (config.isProd) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Extract user roles from headers for all routes
+// Extract user roles and user ID from headers for all routes
 app.use(extractRoles);
+app.use(authMiddleware);
 
 // Simple Hello World route
 app.get('/', (req, res) => {
@@ -43,6 +46,9 @@ app.use('/api/auth', authRoutes);
 
 // Mount user routes (formerly protected routes)
 app.use('/api/users', userRoutes);
+
+// Mount exam routes
+app.use('/api/exams', examRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -95,10 +95,28 @@ const updateData = async (table, data, match) => {
       .map(([key, value]) => `${key}=eq.${value}`)
       .join('&');
     
-    const response = await client.patch(`/rest/v1/${table}?${matchString}`, data);
+    console.log(`Updating ${table} with data:`, JSON.stringify(data));
+    console.log(`Using match condition: ${matchString}`);
+    console.log(`Full URL: /rest/v1/${table}?${matchString}`);
+    
+    // Add single=true header to get back single object instead of array
+    const response = await client.patch(
+      `/rest/v1/${table}?${matchString}`, 
+      data,
+      { headers: { 'Prefer': 'return=representation' } }
+    );
+    
+    console.log(`Update response status:`, response.status);
+    console.log(`Update response data:`, JSON.stringify(response.data));
+    
+    if (!response.data || (Array.isArray(response.data) && response.data.length === 0)) {
+      console.warn(`⚠️ No rows were updated in ${table}. This might indicate a row-level security issue.`);
+    }
+    
     return response.data;
   } catch (error) {
     console.error(`Error updating data in ${table}:`, error.message);
+    console.error('Full error:', error.response ? error.response.data : error);
     throw error;
   }
 };
