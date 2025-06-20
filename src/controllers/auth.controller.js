@@ -1,27 +1,40 @@
-// Import shared users array from dedicated module
-const users = require('../models/users');
+const db = require('../utils/db');
 const { sendSuccess, sendError, HTTP_STATUS } = require('../utils/response');
+
+// Table name for users in Supabase
+const USERS_TABLE = 'users';
 
 /**
  * Authenticate a user with expanded profile data
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  */
-const authenticate = (req, res) => {
+const authenticate = async (req, res) => {
   try {
-    const { user_id, name, role, login_platform, mobile_no, gender, dob } = req.body;
+    const { 
+      user_id, // This will be used as auth_id in our table
+      name, 
+      role,
+      email,
+      contact_number,
+      gender, 
+      dob,
+      profile_picture,
+      is_anonymous = false,
+      is_approved = false
+    } = req.body;
 
     // Validate required fields
-    if (!user_id || !name) {
+    if (!user_id) {
       return sendError(
         res, 
-        'Missing required fields: user_id and name are required', 
+        'Missing required field: user_id is required', 
         HTTP_STATUS.BAD_REQUEST
       );
     }
     
-    // Validate that role is an array of strings
-    if (!role || !Array.isArray(role)) {
+    // Validate that role is an array of strings if provided
+    if (role && !Array.isArray(role)) {
       return sendError(
         res, 
         'Role must be provided as an array of strings', 
@@ -29,8 +42,8 @@ const authenticate = (req, res) => {
       );
     }
     
-    // Validate each role is a string
-    if (!role.every(r => typeof r === 'string')) {
+    // Validate each role is a string if provided
+    if (role && !role.every(r => typeof r === 'string')) {
       return sendError(
         res, 
         'Each role must be a string', 
@@ -39,32 +52,41 @@ const authenticate = (req, res) => {
     }
 
     // Create user object with all provided fields
-    const newUser = { 
-      user_id, 
+    const userData = { 
+      user_id, // Primary key is user_id now
       name, 
-      role,
-      login_platform: login_platform || null,
-      mobile_no: mobile_no || null,
+      email,
+      contact_number,
       gender: gender || null,
-      dob: dob || null
+      dob: dob || null,
+      profile_picture: profile_picture || null,
+      is_anonymous,
+      is_approved,
+      role
     };
     
     // Check if user already exists
-    const existingUserIndex = users.findIndex(u => u.user_id === user_id);
+    const existingUsers = await db.fetchData(USERS_TABLE, {
+      user_id: `eq.${user_id}`,
+      select: 'user_id'
+    });
     
-    if (existingUserIndex >= 0) {
+    let user;
+    if (existingUsers && existingUsers.length > 0) {
       // Update existing user
-      users[existingUserIndex] = newUser;
+      user = await db.updateData(USERS_TABLE, userData, { user_id });
+      console.log(`User ${user_id} updated in database`);
     } else {
-      // Add new user
-      users.push(newUser);
+      // Add new user - created_at will be set by default in the database
+      user = await db.insertData(USERS_TABLE, userData);
+      console.log(`User ${user_id} created in database`);
     }
 
     // Return success response
     return sendSuccess(
       res,
       'User authenticated successfully',
-      newUser,
+      user,
       HTTP_STATUS.OK
     );
   } catch (error) {
@@ -73,7 +95,7 @@ const authenticate = (req, res) => {
       res,
       'Authentication failed',
       HTTP_STATUS.INTERNAL_SERVER_ERROR,
-      error
+      error.message
     );
   }
 };

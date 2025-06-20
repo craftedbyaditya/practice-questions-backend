@@ -87,6 +87,22 @@ const config = {
   logging: {
     level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
   },
+  
+  // Database settings (Supabase)
+  database: {
+    supabase: {
+      url: requiredEnvVar('SUPABASE_URL'),
+      key: requiredEnvVar('SUPABASE_KEY'),
+      jwtSecret: process.env.SUPABASE_JWT_SECRET,
+    }
+  },
+  
+  // API Services
+  services: {
+    api: {
+      baseUrl: requiredEnvVar('API_BASE_URL'),
+    }
+  },
 };
 
 module.exports = config;
