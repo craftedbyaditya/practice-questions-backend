@@ -323,11 +323,69 @@ const getExamsByUserId = async (req, res) => {
   }
 };
 
+/**
+ * Get exam with nested subjects and topics
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+const getExamWithSubjectsAndTopics = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return sendError(res, 'Exam ID is required', HTTP_STATUS.BAD_REQUEST);
+    }
+    
+    // Get exam first
+    const exams = await db.fetchData(EXAMS_TABLE, { id: `eq.${id}` });
+    if (!exams || exams.length === 0) {
+      return sendError(res, `Exam with ID ${id} not found`, HTTP_STATUS.NOT_FOUND);
+    }
+    const exam = exams[0];
+    
+    // Get subjects for this exam
+    const subjects = await db.fetchData('subjects', { exam_id: `eq.${id}` });
+    
+    // For each subject, get its topics
+    const subjectsWithTopics = [];
+    
+    for (const subject of subjects) {
+      const topics = await db.fetchData('topics', { subject_id: `eq.${subject.id}` });
+      
+      subjectsWithTopics.push({
+        ...subject,
+        topics: topics || []
+      });
+    }
+    
+    // Return response with exam and nested subjects/topics
+    const result = {
+      ...exam,
+      subjects: subjectsWithTopics || []
+    };
+    
+    return sendSuccess(
+      res,
+      'Exam with subjects and topics retrieved successfully',
+      result
+    );
+  } catch (error) {
+    console.error('Error retrieving exam with subjects and topics:', error);
+    return sendError(
+      res,
+      'Failed to retrieve exam with subjects and topics',
+      HTTP_STATUS.INTERNAL_SERVER_ERROR,
+      error.message
+    );
+  }
+};
+
 module.exports = {
   createExam,
   getAllExams,
   getExamById,
   updateExamById,
   deleteExamById,
-  getExamsByUserId
+  getExamsByUserId,
+  getExamWithSubjectsAndTopics
 };
