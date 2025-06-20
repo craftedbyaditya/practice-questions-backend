@@ -1,48 +1,66 @@
-// STANDALONE SERVERLESS FUNCTION - NO IMPORTS FROM MAIN APP
+// Serverless entry point for Vercel deployment
+// Load environment variables
+require('dotenv').config();
 
 const express = require('express');
-const app = express();
 
-// Middleware
-app.use(express.json());
+// Keep the standalone health check for diagnostics
+const healthCheckApp = express();
 
-// Basic health check route
-app.get('/api/health', (req, res) => {
+// Add the health check route to verify environment variables
+healthCheckApp.get('/api/health', (req, res) => {
   return res.status(200).json({
     status: 'ok',
     environment: process.env.NODE_ENV || 'development',
     timestamp: new Date().toISOString(),
     message: 'API health check successful',
     envVars: {
-      // List environment variables names that are available (without showing values)
-      available: Object.keys(process.env)
+      // List environment variable names only (no values for security)
+      available: Object.keys(process.env),
+      // Check if critical variables are set (without showing values)
+      hasCriticalVars: {
+        SUPABASE_URL: !!process.env.SUPABASE_URL,
+        SUPABASE_KEY: !!process.env.SUPABASE_KEY,
+        API_BASE_URL: !!process.env.API_BASE_URL
+      }
     }
   });
 });
 
-// Basic auth route that doesn't use Supabase
-app.post('/api/auth/test', (req, res) => {
-  const { user_id, name, role } = req.body;
+// Use a try/catch to safely attempt to load the main app
+let mainApp;
+try {
+  // Import the main Express app
+  mainApp = require('../src/app');
+  console.log('Main application loaded successfully');
+} catch (error) {
+  console.error('Error loading main application:', error);
   
-  if (!user_id || !name) {
-    return res.status(400).json({
+  // Create a fallback app if main app fails to load
+  const fallbackApp = express();
+  
+  fallbackApp.use(express.json());
+  
+  fallbackApp.all('*', (req, res) => {
+    return res.status(500).json({
       success: false,
-      message: 'Missing required fields',
-      required: ['user_id', 'name']
+      message: 'Application failed to initialize',
+      error: error.message,
+      path: req.path
     });
-  }
-  
-  return res.status(200).json({
-    success: true,
-    message: 'Test auth successful',
-    user: {
-      user_id,
-      name,
-      role: role || ['user'],
-      created: new Date().toISOString()
-    }
   });
-});
+  
+  mainApp = fallbackApp;
+}
+
+// Combine the health check and main app
+const combinedApp = express();
+
+// Mount the health check app
+combinedApp.use(healthCheckApp);
+
+// Mount the main app - all other routes go to the main app
+combinedApp.use(mainApp);
 
 // Export the express app as a serverless function
-module.exports = app;
+module.exports = combinedApp;
