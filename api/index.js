@@ -1,11 +1,48 @@
-// Serverless entry point for Vercel deployment
-require('dotenv').config();
+// STANDALONE SERVERLESS FUNCTION - NO IMPORTS FROM MAIN APP
 
-// Force production mode for Vercel deployment
-process.env.NODE_ENV = 'production';
+const express = require('express');
+const app = express();
 
-// Import Express app but don't call listen - Vercel will handle that
-const app = require('../src/app');
+// Middleware
+app.use(express.json());
 
-// Export the Express app as a serverless function
+// Basic health check route
+app.get('/api/health', (req, res) => {
+  return res.status(200).json({
+    status: 'ok',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
+    message: 'API health check successful',
+    envVars: {
+      // List environment variables names that are available (without showing values)
+      available: Object.keys(process.env)
+    }
+  });
+});
+
+// Basic auth route that doesn't use Supabase
+app.post('/api/auth/test', (req, res) => {
+  const { user_id, name, role } = req.body;
+  
+  if (!user_id || !name) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing required fields',
+      required: ['user_id', 'name']
+    });
+  }
+  
+  return res.status(200).json({
+    success: true,
+    message: 'Test auth successful',
+    user: {
+      user_id,
+      name,
+      role: role || ['user'],
+      created: new Date().toISOString()
+    }
+  });
+});
+
+// Export the express app as a serverless function
 module.exports = app;
