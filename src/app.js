@@ -4,6 +4,7 @@ const userRoutes = require('./routes/user.routes');
 const examRoutes = require('./routes/exam.routes');
 const subjectRoutes = require('./routes/subject.routes');
 const topicRoutes = require('./routes/topic.routes');
+const translationRoutes = require('./routes/translation.routes');
 const { sendError, HTTP_STATUS } = require('./utils/response');
 const { extractRoles } = require('./middleware/role.middleware');
 const { helmet, cors, rateLimit } = require('./middleware/security.middleware');
@@ -57,6 +58,9 @@ app.use('/api/subjects', subjectRoutes);
 
 // Mount topic routes
 app.use('/api/topics', topicRoutes);
+
+// Mount translation routes
+app.use('/api/translations', translationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
